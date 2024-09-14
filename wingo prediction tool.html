@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wingo Prediction Tool</title>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to right, #e0f7fa, #b9fbc0);
+        }
+
+        .container {
+            text-align: center;
+            background-color: #ffffff;
+            padding: 2em;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            margin: 0 1em;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 1em;
+        }
+
+        .startButton, .resultButton, .resetButton {
+            padding: 0.8em 1.5em;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+            margin: 0.5em;
+            display: inline-block;
+        }
+
+        .startButton {
+            background-color: #007bff;
+        }
+
+        .startButton:hover {
+            background-color: #0056b3;
+        }
+
+        .resultButton.win {
+            background: linear-gradient(to right, #43e97b, #38f9d7);
+        }
+
+        .resultButton.win:hover {
+            background: linear-gradient(to right, #34c759, #1eb4a4);
+        }
+
+        .resultButton.lose {
+            background: linear-gradient(to right, #ff6f61, #ff9770);
+        }
+
+        .resultButton.lose:hover {
+            background: linear-gradient(to right, #ff4d4d, #ff6b6b);
+        }
+
+        .resetButton {
+            background-color: #dc3545;
+        }
+
+        .resetButton:hover {
+            background-color: #c82333;
+        }
+
+        #resultDisplay {
+            margin-top: 1em;
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        #history {
+            margin-top: 1em;
+            text-align: left;
+            max-width: 100%;
+        }
+
+        #historyList {
+            list-style: none;
+            padding: 0;
+        }
+
+        #historyList li {
+            padding: 0.5em;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .win {
+            color: #28a745;
+        }
+
+        .lose {
+            color: #dc3545;
+        }
+
+        @media (max-width: 600px) {
+            .startButton, .resultButton, .resetButton {
+                padding: 0.6em 1.2em;
+                font-size: 0.9em;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            #resultDisplay, #history {
+                font-size: 1em;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .startButton, .resultButton, .resetButton {
+                padding: 0.5em 1em;
+                font-size: 0.8em;
+            }
+
+            h1 {
+                font-size: 1.2em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Wingo Prediction Tool</h1>
+    <button class="startButton" onclick="startGame()">Start Game</button>
+    <button class="resultButton win" onclick="recordWin()">Win</button>
+    <button class="resultButton lose" onclick="recordLose()">Lose</button>
+    <button class="resetButton" onclick="resetPredictions()">Reset Predictions</button>
+
+    <div id="resultDisplay"></div>
+    <div id="history">
+        <h2>Prediction History</h2>
+        <ul id="historyList"></ul>
+    </div>
+</div>
+
+<script>
+    let predictions = [];
+    let correctPredictions = 0;
+    let periodStats = { Big: 0, Small: 0 };
+
+    function startGame() {
+        let gamePeriod = prompt("Enter the last 4 digits of the current game period (0 to 9999):");
+
+        while (gamePeriod === null || gamePeriod.trim() === '' || isNaN(Number(gamePeriod)) || Number(gamePeriod) < 0 || Number(gamePeriod) > 9999) {
+            gamePeriod = prompt("Invalid input. Please enter a number between 0 and 9999:");
+        }
+
+        displayPredictionResult(Number(gamePeriod).toString().padStart(4, '0'));
+    }
+
+    function displayPredictionResult(gamePeriod) {
+        const paddedGamePeriod = gamePeriod.padStart(4, '0');
+        const digits = paddedGamePeriod.split('').map(Number);
+        const currentPrediction = determinePrediction(digits);
+
+        predictions.push({ period: paddedGamePeriod, prediction: currentPrediction, result: 'Pending' });
+
+        const resultDisplay = document.getElementById('resultDisplay');
+        resultDisplay.innerHTML = `
+            <p>Prediction for Period: ${paddedGamePeriod}</p>
+            <p>Prediction: <strong>${currentPrediction}</strong></p>
+        `;
+        
+        updateHistory();
+    }
+
+    function determinePrediction(digits) {
+        const [d1, d2, d3, d4] = digits;
+
+        let prediction;
+        const recentPredictions = predictions.slice(-50);
+        const outcomeCounts = { Big: 0, Small: 0 };
+
+        recentPredictions.forEach(p => {
+            if (p.result === 'Win') {
+                outcomeCounts[p.prediction] = (outcomeCounts[p.prediction] || 0) + 1;
+            }
+        });
+
+        if (d1 === d2 && d3 === d4) {
+            prediction = 'Big';
+        } else if (d1 < d2 && d2 < d3 && d3 < d4) {
+            prediction = 'Small';
+        } else if (d4 % 2 === 0) {
+            prediction = 'Big';
+        } else {
+            prediction = 'Small';
+        }
+
+        const totalPredictions = recentPredictions.length;
+        const winRatio = totalPredictions ? (outcomeCounts.Big / totalPredictions) : 0.5;
+        
+        if (winRatio > 0.5) {
+            prediction = (periodStats.Big > periodStats.Small) ? 'Small' : 'Big';
+        } else {
+            prediction = (periodStats.Big <= periodStats.Small) ? 'Big' : 'Small';
+        }
+
+        periodStats[prediction] = (periodStats[prediction] || 0) + 1;
+
+        if (Math.random() < 0.05) {
+            prediction = (prediction === 'Big') ? 'Small' : 'Big';
+        }
+
+        return prediction;
+    }
+
+    function updateHistory() {
+        const historyList = document.getElementById('historyList');
+        historyList.innerHTML = '';
+
+        predictions.forEach((entry) => {
+            const listItem = document.createElement('li');
+            listItem.textContent = `Period: ${entry.period}, Prediction: ${entry.prediction}, Result: ${entry.result}`;
+            listItem.className = entry.result === 'Win' ? 'win' : 'lose';
+            historyList.appendChild(listItem);
+        });
+    }
+
+    function recordWin() {
+        if (predictions.length === 0) {
+            alert("No prediction to record.");
+            return;
+        }
+
+        predictions[predictions.length - 1].result = 'Win';
+        correctPredictions++;
+        updateHistory();
+    }
+
+    function recordLose() {
+        if (predictions.length === 0) {
+            alert("No prediction to record.");
+            return;
+        }
+
+        predictions[predictions.length - 1].result = 'Lose';
+        updateHistory();
+    }
+
+    function resetPredictions() {
+        if (confirm("Are you sure you want to reset all predictions and history?")) {
+            predictions = [];
+            correctPredictions = 0;
+            periodStats = { Big: 0, Small: 0 };
+            document.getElementById('resultDisplay').innerHTML = '';
+            updateHistory();
+            alert("Prediction history and counts have been reset.");
+        }
+    }
+</script>
+
+</body>
+</html>
